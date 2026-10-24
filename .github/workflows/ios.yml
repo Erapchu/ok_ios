@@ -44,7 +44,7 @@ jobs:
           xcodebuild test -project OKNative.xcodeproj -scheme OKNative \
             -destination 'platform=iOS Simulator,id=${{ steps.simulator.outputs.udid }}' \
             -derivedDataPath build/DerivedData -resultBundlePath build/Tests.xcresult \
-            CODE_SIGNING_ALLOWED=NO | tee build-tests.log
+            CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- | tee build-tests.log
       - name: Capture simulator preview
         env:
           SIMULATOR_ID: ${{ steps.simulator.outputs.udid }}

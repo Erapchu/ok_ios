@@ -31,7 +31,7 @@ GitHub Actions использует `macos-15`: проверяет структ�
 ```bash
 # На macOS: тесты (укажите доступный симулятор)
 xcodebuild test -project OKNative.xcodeproj -scheme OKNative \
-  -destination 'platform=iOS Simulator,name=iPhone 16' CODE_SIGNING_ALLOWED=NO
+  -destination 'platform=iOS Simulator,name=iPhone 16' CODE_SIGN_IDENTITY=-
 
 # Архив и неподписанный IPA
 xcodebuild archive -project OKNative.xcodeproj -scheme OKNative \
@@ -39,6 +39,8 @@ xcodebuild archive -project OKNative.xcodeproj -scheme OKNative \
   -archivePath build/OKNative.xcarchive CODE_SIGNING_ALLOWED=NO
 bash scripts/package_ipa.sh
 ```
+
+Тестовая сборка симулятора использует локальную подпись `-` и отдельные `Simulator.entitlements`, чтобы тестировать настоящий Keychain. Для этого не нужны сертификаты Apple. Эти entitlements не применяются к архиву для iPhone.
 
 После добавления или удаления Swift-файлов обновите проект: `python3 scripts/generate_project.py`. Генерация детерминированная и не требует пакетов. Для быстрой проверки на Windows или macOS:
 

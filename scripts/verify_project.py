@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def main():
-    for path in [ROOT / "OKNative/Resources/Info.plist", ROOT / "OKNative/Resources/PrivacyInfo.xcprivacy"]:
+    for path in [ROOT / "OKNative/Resources/Info.plist", ROOT / "OKNative/Resources/PrivacyInfo.xcprivacy", ROOT / "OKNative/Resources/Simulator.entitlements"]:
         with path.open("rb") as stream:
             plistlib.load(stream)
     ET.parse(ROOT / "OKNative.xcodeproj/xcshareddata/xcschemes/OKNative.xcscheme")

@@ -38,7 +38,8 @@ def generate():
     test_sources = sorted(p.relative_to(ROOT).as_posix() for p in (ROOT / "OKNativeTests").rglob("*.swift"))
     resources = ["OKNative/Resources/Assets.xcassets", "OKNative/Resources/PrivacyInfo.xcprivacy"]
     references = {}
-    for path in app_sources + test_sources + resources + ["OKNative/Resources/Info.plist"]:
+    configuration_files = ["OKNative/Resources/Info.plist", "OKNative/Resources/Simulator.entitlements"]
+    for path in app_sources + test_sources + resources + configuration_files:
         kind = "sourcecode.swift" if path.endswith(".swift") else "folder.assetcatalog" if path.endswith(".xcassets") else "text.xml"
         references[path] = add(path, "PBXFileReference", lastKnownFileType=kind, path=path, sourceTree="<group>")
 
@@ -46,7 +47,7 @@ def generate():
     test_product = add("test-product", "PBXFileReference", explicitFileType="wrapper.cfbundle", path="OKNativeTests.xctest", sourceTree="BUILT_PRODUCTS_DIR")
     source_group = add("source-group", "PBXGroup", name="App", children=[references[p] for p in app_sources], sourceTree="<group>")
     test_group = add("test-group", "PBXGroup", name="Tests", children=[references[p] for p in test_sources], sourceTree="<group>")
-    resource_group = add("resource-group", "PBXGroup", name="Resources", children=[references[p] for p in resources + ["OKNative/Resources/Info.plist"]], sourceTree="<group>")
+    resource_group = add("resource-group", "PBXGroup", name="Resources", children=[references[p] for p in resources + configuration_files], sourceTree="<group>")
     products_group = add("products-group", "PBXGroup", name="Products", children=[app_product, test_product], sourceTree="<group>")
     main_group = add("main-group", "PBXGroup", children=[source_group, resource_group, test_group, products_group], sourceTree="<group>")
 
@@ -88,6 +89,7 @@ def generate():
         "SUPPORTED_PLATFORMS": "iphoneos iphonesimulator", "SUPPORTS_MACCATALYST": "NO",
         "LD_RUNPATH_SEARCH_PATHS": "$(inherited) @executable_path/Frameworks",
         "SWIFT_EMIT_LOC_STRINGS": "YES", "ENABLE_PREVIEWS": "YES",
+        "CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]": "OKNative/Resources/Simulator.entitlements",
     })
     test_configs = configurations("tests", {
         "PRODUCT_NAME": "$(TARGET_NAME)", "PRODUCT_BUNDLE_IDENTIFIER": "app.erapchu.oknative.tests",

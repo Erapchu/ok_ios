@@ -120,6 +120,12 @@
 			"path" = "OKNative/Resources/Info.plist";
 			"sourceTree" = "<group>";
 		};
+		"C2F07122F515A3E44AF6B078" = {
+			"isa" = "PBXFileReference";
+			"lastKnownFileType" = "text.xml";
+			"path" = "OKNative/Resources/Simulator.entitlements";
+			"sourceTree" = "<group>";
+		};
 		"4E783A9E10D2A8ABA38CD11C" = {
 			"isa" = "PBXFileReference";
 			"explicitFileType" = "wrapper.application";
@@ -169,6 +175,7 @@
 				"22A724FD03DDA93FA72309AF",
 				"567AC2BE042AAB9AC2541BF8",
 				"2825FE59D36A02268C150EE8",
+				"C2F07122F515A3E44AF6B078",
 			);
 			"sourceTree" = "<group>";
 		};
@@ -391,6 +398,7 @@
 				"LD_RUNPATH_SEARCH_PATHS" = "$(inherited) @executable_path/Frameworks";
 				"SWIFT_EMIT_LOC_STRINGS" = "YES";
 				"ENABLE_PREVIEWS" = "YES";
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = "OKNative/Resources/Simulator.entitlements";
 			};
 			"name" = "Debug";
 		};
@@ -410,6 +418,7 @@
 				"LD_RUNPATH_SEARCH_PATHS" = "$(inherited) @executable_path/Frameworks";
 				"SWIFT_EMIT_LOC_STRINGS" = "YES";
 				"ENABLE_PREVIEWS" = "YES";
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = "OKNative/Resources/Simulator.entitlements";
 			};
 			"name" = "Release";
 		};

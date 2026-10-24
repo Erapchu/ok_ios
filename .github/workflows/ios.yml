@@ -43,18 +43,9 @@ jobs:
           set -o pipefail
           xcodebuild test -project OKNative.xcodeproj -scheme OKNative \
             -destination 'platform=iOS Simulator,id=${{ steps.simulator.outputs.udid }}' \
+            -parallel-testing-enabled NO \
             -derivedDataPath build/DerivedData -resultBundlePath build/Tests.xcresult \
             CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- | tee build-tests.log
-      - name: Capture simulator preview
-        env:
-          SIMULATOR_ID: ${{ steps.simulator.outputs.udid }}
-        run: |
-          xcrun simctl launch --terminate-running-process "$SIMULATOR_ID" app.erapchu.oknative
-          sleep 3
-          xcrun simctl io "$SIMULATOR_ID" screenshot build/profile-light.png
-          xcrun simctl ui "$SIMULATOR_ID" appearance dark
-          sleep 2
-          xcrun simctl io "$SIMULATOR_ID" screenshot build/profile-dark.png
       - name: Archive unsigned iPhone app
         run: |
           set -o pipefail
@@ -73,6 +64,21 @@ jobs:
           if-no-files-found: error
           compression-level: 0
           retention-days: 14
+      - name: Capture simulator preview
+        continue-on-error: true
+        env:
+          SIMULATOR_ID: ${{ steps.simulator.outputs.udid }}
+        run: |
+          xcrun simctl bootstatus "$SIMULATOR_ID" -b
+          xcrun simctl install "$SIMULATOR_ID" build/DerivedData/Build/Products/Debug-iphonesimulator/OKNative.app
+          xcrun simctl ui "$SIMULATOR_ID" appearance light
+          xcrun simctl status_bar "$SIMULATOR_ID" override --time '9:41' --batteryState charged --batteryLevel 100
+          xcrun simctl launch --terminate-running-process "$SIMULATOR_ID" app.erapchu.oknative
+          sleep 4
+          xcrun simctl io "$SIMULATOR_ID" screenshot build/profile-light.png
+          xcrun simctl ui "$SIMULATOR_ID" appearance dark
+          sleep 2
+          xcrun simctl io "$SIMULATOR_ID" screenshot build/profile-dark.png
       - name: Upload test results and logs
         if: always()
         uses: actions/upload-artifact@v7

@@ -66,9 +66,20 @@ jobs:
           retention-days: 14
       - name: Capture simulator preview
         continue-on-error: true
+        timeout-minutes: 3
         env:
           SIMULATOR_ID: ${{ steps.simulator.outputs.udid }}
         run: |
+          # Xcode may run tests on a clone. Reuse a booted iOS device when possible.
+          xcrun simctl list devices booted --json > "$RUNNER_TEMP/booted.json"
+          SIMULATOR_ID="$(python3 - <<'PY'
+          import json, os
+          with open(os.environ['RUNNER_TEMP'] + '/booted.json') as f:
+              devices = json.load(f)['devices']
+          booted = [d['udid'] for runtime, rows in devices.items() if 'iOS' in runtime for d in rows if d['state'] == 'Booted']
+          print(booted[0] if booted else os.environ['SIMULATOR_ID'])
+          PY
+          )"
           xcrun simctl bootstatus "$SIMULATOR_ID" -b
           xcrun simctl install "$SIMULATOR_ID" build/DerivedData/Build/Products/Debug-iphonesimulator/OKNative.app
           xcrun simctl ui "$SIMULATOR_ID" appearance light

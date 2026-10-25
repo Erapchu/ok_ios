@@ -31,7 +31,8 @@ final class OKAPITests: XCTestCase {
     }
 
     func testSessionAndPermissionErrorsInsideHTTP200() async throws {
-        for (token, expected) in [("expired", OKAPIError.authentication), ("denied", .permission)] {
+        for (token, expected) in [("expired", OKAPIError.authentication), ("denied", .permission),
+                                  ("invalid-session", .authentication), ("invalid-signature", .invalidCredentials)] {
             let api = OKAPIClient(credentials: Self.tokens(token), transport: Self.transport())
             do {
                 let _: OKUser = try await api.call("users.getCurrentUser")
@@ -71,6 +72,15 @@ final class OKAPITests: XCTestCase {
         expired = AuthTokens(accessToken: expired.accessToken, expiresAt: .distantPast,
                              applicationKey: expired.applicationKey, sessionSecretKey: expired.sessionSecretKey)
         XCTAssertThrowsError(try OKAPIClient.validate(expired)) { XCTAssertEqual($0 as? OKAPIError, .authentication) }
+    }
+
+    func testCurrentPhotoResponseSchema() throws {
+        let data = Data(#"{"photos":[{"id":"5","text":"Caption","pic640x480":"https://example.invalid/p.jpg"}],"has_more":true,"anchor":"next","totalCount":100}"#.utf8)
+        let result = try JSONDecoder().decode(OKPhotosResponse.self, from: data)
+        XCTAssertEqual(result.photos.first?.id, "5")
+        XCTAssertEqual(result.anchor, "next")
+        XCTAssertTrue(result.hasMore)
+        XCTAssertEqual(result.totalCount, 100)
     }
 }
 
@@ -172,6 +182,8 @@ private final class OKFixtureProtocol: URLProtocol, @unchecked Sendable {
         let method = fields["method"] ?? ""
         let payload: String
         if token == "expired" { payload = #"{"error_code":102,"error_msg":"secret-token-echo"}"# }
+        else if token == "invalid-session" { payload = #"{"error_code":103}"# }
+        else if token == "invalid-signature" { payload = #"{"error_code":104}"# }
         else if token == "denied" || (token == "photos-denied" && method == "photos.getPhotos") { payload = #"{"error_code":10}"# }
         else {
             switch method {

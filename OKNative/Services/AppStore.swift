@@ -5,7 +5,7 @@ import SwiftData
 @MainActor
 @Observable
 final class AppStore {
-    enum SessionState { case restoring, signedOut, connected, expired }
+    enum SessionState: Equatable { case restoring, signedOut, connected, expired }
     private(set) var snapshot: SocialSnapshot?
     private(set) var savedKeys: Set<String> = []
     private(set) var isLoading = false
@@ -52,14 +52,14 @@ final class AppStore {
         }
     }
 
-    func connect(applicationKey: String, token: String, secret: String, context: ModelContext) async -> Bool {
+    func connect(applicationKey: String, token: String, secret: String, expiresAt: Date? = nil, context: ModelContext) async -> Bool {
         guard !isConnecting, !isPreview else { return false }
         isConnecting = true
         defer { isConnecting = false }
         generation = UUID()
         let attempt = generation
         connectionError = nil
-        var tokens = AuthTokens(accessToken: token.trimmingCharacters(in: .whitespacesAndNewlines), expiresAt: nil)
+        var tokens = AuthTokens(accessToken: token.trimmingCharacters(in: .whitespacesAndNewlines), expiresAt: expiresAt)
         tokens.applicationKey = applicationKey.trimmingCharacters(in: .whitespacesAndNewlines)
         tokens.sessionSecretKey = secret.trimmingCharacters(in: .whitespacesAndNewlines)
         do {

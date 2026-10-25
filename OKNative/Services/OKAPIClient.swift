@@ -54,7 +54,8 @@ struct OKAPIClient: Sendable {
         // OK reports application errors inside HTTP 200 responses as well.
         if let failure = try? JSONDecoder().decode(APIErrorEnvelope.self, from: data) {
             switch failure.errorCode {
-            case 102: throw OKAPIError.authentication
+            case 102, 103, 453: throw OKAPIError.authentication
+            case 101, 104: throw OKAPIError.invalidCredentials
             case 10, 200, 457: throw OKAPIError.permission
             default: throw OKAPIError.server(failure.errorCode)
             }
@@ -69,6 +70,7 @@ struct OKAPIClient: Sendable {
         fields["method"] = method
         fields["application_key"] = credentials.applicationKey
         fields["format"] = "json"
+        fields["platform"] = "IOS"
         fields["__online"] = "false"
         fields.removeValue(forKey: "sig")
         fields.removeValue(forKey: "access_token")

@@ -25,9 +25,13 @@ struct ConnectAccountView: View {
                     Image("AppMark").resizable().frame(width: 76, height: 76)
                         .clipShape(RoundedRectangle(cornerRadius: 22))
                     Text("Ваш ОК.\nНа вашем iPhone.").font(.largeTitle.bold())
+                        .lineLimit(nil).fixedSize(horizontal: false, vertical: true)
                     Text("Войдите, чтобы увидеть свой профиль, друзей и фотографии в нативном интерфейсе.")
                         .foregroundStyle(.secondary)
-                }.padding(.vertical, 12)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.vertical, 12)
             }.listRowBackground(Color.clear)
 
             Section {

@@ -82,16 +82,25 @@ struct PhotoViewer: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
     @Environment(AppStore.self) private var store
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage("haptics") private var haptics = true
     @State private var photos: [SocialPhoto]
     @State private var selection: String
 
     init(photos: [SocialPhoto], initialID: String) {
         _photos = State(initialValue: photos)
-        _selection = State(initialValue: initialID)
+        _selection = State(initialValue: photos.contains { $0.id == initialID } ? initialID : photos.first?.id ?? initialID)
     }
 
+    private var currentIndex: Int? { photos.firstIndex { $0.id == selection } }
     private var current: SocialPhoto? { photos.first { $0.id == selection } }
+
+    private var scrollSelection: Binding<String?> {
+        Binding(
+            get: { selection },
+            set: { if let id = $0 { selection = id } }
+        )
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -100,16 +109,26 @@ struct PhotoViewer: View {
                     Image(systemName: "xmark").font(.headline).frame(width: 44, height: 44)
                 }.modifier(GlassActionStyle()).accessibilityLabel("Закрыть фотографию")
                 Spacer()
-                if let index = photos.firstIndex(where: { $0.id == selection }) {
-                    Text("\(index + 1) / \(photos.count)").font(.subheadline.monospacedDigit())
+                if let index = currentIndex {
+                    HStack(spacing: 8) {
+                        Button { movePhoto(by: -1) } label: {
+                            Image(systemName: "chevron.left").frame(width: 44, height: 44)
+                        }
+                        .modifier(GlassActionStyle())
+                        .disabled(index == 0)
+                        .accessibilityLabel("Предыдущая фотография")
+                        Text("\(index + 1) / \(photos.count)").font(.subheadline.monospacedDigit())
+                            .accessibilityLabel("Фотография \(index + 1) из \(photos.count)")
+                        Button { movePhoto(by: 1) } label: {
+                            Image(systemName: "chevron.right").frame(width: 44, height: 44)
+                        }
+                        .modifier(GlassActionStyle())
+                        .disabled(index == photos.count - 1)
+                        .accessibilityLabel("Следующая фотография")
+                    }
                 }
             }.padding(.horizontal, 20).padding(.top, 12)
-            TabView(selection: $selection) {
-                ForEach(photos) { photo in
-                    MediaImage(reference: photo.asset, mode: .fit).padding(.vertical, 20)
-                        .tag(photo.id).accessibilityLabel("\(photo.title), \(photo.location)")
-                }
-            }.tabViewStyle(.page(indexDisplayMode: .never))
+            photoPager
             if let photo = current {
                 HStack(spacing: 20) {
                     VStack(alignment: .leading, spacing: 5) {
@@ -142,6 +161,36 @@ struct PhotoViewer: View {
         }
         .background(.black).foregroundStyle(.white)
         .preferredColorScheme(.dark)
+    }
+
+    private var photoPager: some View {
+        GeometryReader { geometry in
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: 0) {
+                    ForEach(photos) { photo in
+                        MediaImage(reference: photo.asset, mode: .fit)
+                            .padding(.vertical, 20)
+                            .frame(width: geometry.size.width, height: geometry.size.height)
+                            .background(.black)
+                            .clipped()
+                            .contentShape(Rectangle())
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel("\(photo.title), \(photo.location)")
+                            .id(photo.id)
+                    }
+                }
+                .scrollTargetLayout()
+            }
+            .scrollTargetBehavior(.paging)
+            .scrollPosition(id: scrollSelection, anchor: .center)
+        }
+    }
+
+    private func movePhoto(by offset: Int) {
+        guard let index = currentIndex, photos.indices.contains(index + offset) else { return }
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) {
+            selection = photos[index + offset].id
+        }
     }
 }
 

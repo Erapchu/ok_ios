@@ -61,7 +61,7 @@ struct FloatingGlass: ViewModifier {
 
 struct LiquidTabBehavior: ViewModifier {
     @ViewBuilder func body(content: Content) -> some View {
-        if #available(iOS 26.0, *) { content.tabBarMinimizeBehavior(.onScrollDown) }
+        if #available(iOS 26.0, *) { content.tabBarMinimizeBehavior(.never) }
         else { content }
     }
 }

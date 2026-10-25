@@ -66,12 +66,17 @@ final class OKAPITests: XCTestCase {
         XCTAssertEqual(snapshot.issues.map(\.section), ["photos"])
     }
 
-    func testMissingOrExpiredCredentialsAreRejectedLocally() throws {
+    func testMissingCredentialsAreRejectedLocally() throws {
         XCTAssertThrowsError(try OKAPIClient.validate(AuthTokens(accessToken: "x", expiresAt: nil)))
-        var expired = Self.tokens()
-        expired = AuthTokens(accessToken: expired.accessToken, expiresAt: .distantPast,
-                             applicationKey: expired.applicationKey, sessionSecretKey: expired.sessionSecretKey)
-        XCTAssertThrowsError(try OKAPIClient.validate(expired)) { XCTAssertEqual($0 as? OKAPIError, .authentication) }
+    }
+
+    func testOriginalExpiryDoesNotBlockServerExtendedToken() async throws {
+        let saved = Self.tokens()
+        let extended = AuthTokens(accessToken: saved.accessToken, expiresAt: .distantPast,
+                                  applicationKey: saved.applicationKey, sessionSecretKey: saved.sessionSecretKey)
+        let api = OKAPIClient(credentials: extended, transport: Self.transport())
+        let user: OKUser = try await api.call("users.getCurrentUser")
+        XCTAssertEqual(user.id, "42")
     }
 
     func testCurrentPhotoResponseSchema() throws {
@@ -89,6 +94,64 @@ final class LiveSessionTests: XCTestCase {
     private func container() throws -> ModelContainer {
         try ModelContainer(for: CachedSnapshot.self, SavedReaction.self,
                            configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+    }
+
+    private func cachedContainer() throws -> ModelContainer {
+        let storage = try container()
+        var profile = UserProfile(name: "Cached", city: "", bio: "", avatar: "")
+        profile.id = "42"
+        let snapshot = SocialSnapshot(profile: profile, friends: [], photos: [], posts: [])
+        storage.mainContext.insert(CachedSnapshot(payload: try JSONEncoder().encode(snapshot), key: "ok-v2:42"))
+        try storage.mainContext.save()
+        return storage
+    }
+
+    func testRestoreAcceptsServerExtendedTokenWithOriginalExpiryInPast() async throws {
+        let vault = KeychainTokenStore(service: "app.oknative.tests.\(UUID().uuidString)")
+        let tokens = AuthTokens(accessToken: "test-access", expiresAt: .distantPast,
+                                applicationKey: "test-public", sessionSecretKey: "test-session-secret", accountID: "42")
+        try await vault.save(tokens)
+        defer { Task { try? await vault.delete() } }
+        let storage = try container()
+        let store = AppStore(vault: vault, transport: OKAPITests.transport())
+        await store.restore(context: storage.mainContext)
+        XCTAssertEqual(store.sessionState, .connected)
+        XCTAssertEqual(store.snapshot?.profile.name, "API User")
+        XCTAssertNil(store.errorMessage)
+    }
+
+    func testCachedLaunchChecksSessionWithServerAndStaysConnectedOffline() async throws {
+        for (token, expected) in [("test-access", AppStore.SessionState.connected),
+                                  ("expired", .expired), ("invalid-session", .expired), ("offline", .connected)] {
+            let vault = KeychainTokenStore(service: "app.oknative.tests.\(UUID().uuidString)")
+            let tokens = AuthTokens(accessToken: token, expiresAt: .distantPast,
+                                    applicationKey: "test-public", sessionSecretKey: "test-session-secret", accountID: "42")
+            try await vault.save(tokens)
+            let storage = try cachedContainer()
+            let store = AppStore(vault: vault, transport: OKAPITests.transport())
+            await store.restore(context: storage.mainContext)
+            XCTAssertEqual(store.sessionState, expected, token)
+            XCTAssertEqual(store.snapshot?.profile.name, "Cached", token)
+            let saved = try await vault.read()
+            XCTAssertEqual(saved, tokens, "Session checks must preserve stored credentials")
+            if expected == .connected { XCTAssertNil(store.errorMessage, token) }
+            else { XCTAssertNotNil(store.errorMessage, token) }
+            try await vault.delete()
+        }
+    }
+
+    func testLateSessionRejectionCannotChangeSignedOutState() async throws {
+        let vault = KeychainTokenStore(service: "app.oknative.tests.\(UUID().uuidString)")
+        try await vault.save(OKAPITests.tokens("slow-session-rejected"))
+        let storage = try cachedContainer()
+        let store = AppStore(vault: vault, transport: OKAPITests.transport())
+        let restore = Task { await store.restore(context: storage.mainContext) }
+        try await Task.sleep(for: .milliseconds(30))
+        await store.signOut(context: storage.mainContext)
+        await restore.value
+        XCTAssertEqual(store.sessionState, .signedOut)
+        XCTAssertNil(store.snapshot)
+        XCTAssertNil(store.errorMessage)
     }
 
     func testNormalLaunchHasNoDemoFallback() async throws {
@@ -213,8 +276,13 @@ private final class OKFixtureProtocol: URLProtocol, @unchecked Sendable {
         let fields = Dictionary((components?.queryItems ?? []).map { ($0.name, $0.value ?? "") }, uniquingKeysWith: { _, new in new })
         let token = fields["access_token"] ?? ""
         let method = fields["method"] ?? ""
+        if token == "offline" {
+            client?.urlProtocol(self, didFailWithError: URLError(.notConnectedToInternet))
+            return
+        }
         let payload: String
-        if token == "expired" { payload = #"{"error_code":102,"error_msg":"secret-token-echo"}"# }
+        if token == "slow-session-rejected" { payload = #"{"error_code":102}"# }
+        else if token == "expired" { payload = #"{"error_code":102,"error_msg":"secret-token-echo"}"# }
         else if token == "invalid-session" { payload = #"{"error_code":103}"# }
         else if token == "invalid-signature" { payload = #"{"error_code":104}"# }
         else if token == "denied" || (token == "photos-denied" && method == "photos.getPhotos") { payload = #"{"error_code":10}"# }
@@ -227,7 +295,7 @@ private final class OKFixtureProtocol: URLProtocol, @unchecked Sendable {
             default: payload = #"{"error_code":3}"#
             }
         }
-        if token == "slow" {
+        if token == "slow" || token == "slow-session-rejected" {
             DispatchQueue.global().asyncAfter(deadline: .now() + 0.2) { self.reply(payload) }
         } else { reply(payload) }
     }

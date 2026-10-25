@@ -20,6 +20,7 @@ final class OAuthTests: XCTestCase {
         XCTAssertEqual(values["redirect_uri"], "ok512005294190://authorize")
         XCTAssertEqual(values["state"], "test-state")
         XCTAssertEqual(values["response_type"], "token")
+        XCTAssertEqual(values["scope"], "VALUABLE_ACCESS;LONG_ACCESS_TOKEN")
         XCTAssertNil(values["client_secret"])
     }
 

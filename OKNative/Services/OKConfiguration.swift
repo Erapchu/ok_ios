@@ -14,7 +14,7 @@ enum OKOAuthFlow {
         var errorDescription: String? {
             switch self {
             case .invalidCallback, .stateMismatch: "Не удалось проверить ответ авторизации. Повторите вход."
-            case .denied: "ОК не предоставил доступ. Проверьте клиентскую OAuth-авторизацию и разрешение VALUABLE_ACCESS в настройках приложения."
+            case .denied: "ОК не предоставил доступ. Проверьте клиентскую OAuth-авторизацию и разрешения VALUABLE_ACCESS и LONG_ACCESS_TOKEN в настройках приложения."
             case .missingTokens: "ОК не вернул пару клиентских токенов. Проверьте настройки OAuth; при необходимости используйте личные токены разработчика."
             case .cannotStart: "Не удалось открыть окно входа. Повторите попытку."
             }
@@ -27,7 +27,7 @@ enum OKOAuthFlow {
             URLQueryItem(name: "client_id", value: OKConfiguration.applicationID),
             URLQueryItem(name: "redirect_uri", value: OKConfiguration.redirectURI),
             URLQueryItem(name: "response_type", value: "token"),
-            URLQueryItem(name: "scope", value: "VALUABLE_ACCESS"),
+            URLQueryItem(name: "scope", value: "VALUABLE_ACCESS;LONG_ACCESS_TOKEN"),
             URLQueryItem(name: "layout", value: "m"),
             URLQueryItem(name: "state", value: state)
         ]

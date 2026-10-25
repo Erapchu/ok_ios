@@ -41,7 +41,8 @@ struct OKAPIClient: Sendable {
         guard values.allSatisfy({ !$0.isEmpty && $0.count <= 4096 && !$0.contains(where: \.isWhitespace) }) else {
             throw OKAPIError.invalidCredentials
         }
-        if let expiry = tokens.expiresAt, expiry <= .now { throw OKAPIError.authentication }
+        // OK can extend LONG_ACCESS_TOKEN on its servers without changing the token.
+        // The original expires_in is informational; only the API can reject the session.
     }
 
     func call<Response: Decodable & Sendable>(

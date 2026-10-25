@@ -3,7 +3,7 @@ import Security
 
 struct AuthTokens: Codable, Sendable, Equatable {
     let accessToken: String
-    let expiresAt: Date?
+    let expiresAt: Date? // Initial OAuth expiry, not authoritative after server-side extension.
     var applicationKey: String? = nil
     var sessionSecretKey: String? = nil
     var accountID: String? = nil

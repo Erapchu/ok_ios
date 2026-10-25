@@ -41,10 +41,21 @@ final class AppStore {
                 sessionState = .signedOut; return
             }
             accountID = id
-            service = OKSocialService(api: OKAPIClient(credentials: tokens, transport: transport))
+            let api = OKAPIClient(credentials: tokens, transport: transport)
+            service = OKSocialService(api: api)
             sessionState = .connected
+            let attempt = generation
             await load(context: context)
-            if let expiry = tokens.expiresAt, expiry <= .now { sessionState = .expired }
+            guard generation == attempt, sessionState == .connected else { return }
+            // Cached launches may make no other API calls. An ordinary API call checks
+            // and auto-extends LONG_ACCESS_TOKEN without auth.touchSession's monthly quota.
+            do {
+                let user: OKUser = try await api.call("users.getCurrentUser", parameters: ["fields": "uid"])
+                guard user.id == id else { throw OKAPIError.authentication }
+            } catch {
+                // Offline launches retain cached data; only an auth rejection requires login.
+                if error as? OKAPIError == .authentication { report(error, attempt: attempt) }
+            }
         } catch {
             sessionState = .signedOut
             errorMessage = "Не удалось прочитать Keychain. Разблокируйте iPhone и перезапустите приложение."

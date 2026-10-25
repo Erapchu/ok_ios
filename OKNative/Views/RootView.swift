@@ -31,11 +31,16 @@ struct RootView: View {
                 .tabItem { Label("Фото", systemImage: "photo.on.rectangle.angled") }.tag(AppTab.photos)
             NavigationStack { SettingsView() }
                 .tabItem { Label("Настройки", systemImage: "slider.horizontal.3") }.tag(AppTab.settings)
-            }.modifier(LiquidTabBehavior())
+            }
+            .id(store.snapshot?.profile.id ?? "loading")
+            .modifier(LiquidTabBehavior())
            }
           }
         }
         .task { await store.restore(context: context) }
+        .onChange(of: store.snapshot?.profile.id) { oldID, newID in
+            if newID != nil, newID != oldID { selection = .profile }
+        }
         .sheet(isPresented: $reconnect) { NavigationStack { ConnectAccountView(isSheet: true) } }
         .alert("Не удалось выполнить действие", isPresented: Binding(
             get: { store.errorMessage != nil },

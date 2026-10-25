@@ -154,6 +154,39 @@ final class LiveSessionTests: XCTestCase {
         XCTAssertEqual(store.sessionState, .signedOut)
         XCTAssertEqual(try storage.mainContext.fetchCount(FetchDescriptor<CachedSnapshot>()), 0)
     }
+
+    func testPhotoPagingDeduplicatesAndStopsRepeatedAnchor() async throws {
+        let vault = KeychainTokenStore(service: "app.oknative.tests.\(UUID().uuidString)")
+        let storage = try container()
+        let store = AppStore(vault: vault, transport: OKAPITests.transport())
+        let connected = await store.connect(applicationKey: "test-public", token: "test-access", secret: "test-session-secret", context: storage.mainContext)
+        XCTAssertTrue(connected)
+        await store.loadMorePhotos(context: storage.mainContext)
+        XCTAssertEqual(store.snapshot?.photos.count, 1)
+        XCTAssertNil(store.snapshot?.photoAnchor)
+        await store.signOut(context: storage.mainContext)
+    }
+
+    func testFriendPagingAdvancesPastUnavailableUsers() async throws {
+        let vault = KeychainTokenStore(service: "app.oknative.tests.\(UUID().uuidString)")
+        try await vault.save(OKAPITests.tokens())
+        let storage = try container()
+        var profile = UserProfile(name: "Cached", city: "", bio: "", avatar: "")
+        profile.id = "42"
+        var snapshot = SocialSnapshot(profile: profile, friends: [], photos: [], posts: [])
+        snapshot.friendIDs = ["deleted-a", "private-b"]
+        snapshot.friendCursor = 0
+        storage.mainContext.insert(CachedSnapshot(payload: try JSONEncoder().encode(snapshot), key: "ok-v2:42"))
+        try storage.mainContext.save()
+        let store = AppStore(vault: vault, transport: OKAPITests.transport())
+        await store.restore(context: storage.mainContext)
+        XCTAssertTrue(store.snapshot?.hasMoreFriends == true)
+        await store.loadMoreFriends(context: storage.mainContext)
+        XCTAssertFalse(store.snapshot?.hasMoreFriends == true)
+        XCTAssertEqual(store.snapshot?.friendCursor, 2)
+        XCTAssertTrue(store.snapshot?.friends.isEmpty == true)
+        await store.signOut(context: storage.mainContext)
+    }
 }
 
 private final class OKFixtureProtocol: URLProtocol, @unchecked Sendable {

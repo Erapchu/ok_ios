@@ -21,7 +21,6 @@ final class AppStore {
     private var generation = UUID()
     private let vault: KeychainTokenStore
     private let transport: HTTPClient?
-    private var friendOffset = 0
 
     init(service: (any SocialService)? = nil, vault: KeychainTokenStore = KeychainTokenStore(), transport: HTTPClient? = nil) {
         self.service = service
@@ -75,7 +74,6 @@ final class AppStore {
             service = live
             snapshot = fresh
             sessionState = .connected
-            friendOffset = fresh.friends.count
             errorMessage = nil
             do {
                 try persist(fresh, context: context)
@@ -95,6 +93,7 @@ final class AppStore {
         isLoading = true
         defer { isLoading = false }
         errorMessage = nil
+        if refresh { generation = UUID() }
         let attempt = generation
         do {
             try readReactions(context: context)
@@ -105,7 +104,6 @@ final class AppStore {
                    isPreview || decoded.profile.id == accountID {
                     snapshot = decoded
                     updatedAt = cached.updatedAt
-                    friendOffset = decoded.friends.count
                     return
                 }
             }
@@ -115,7 +113,6 @@ final class AppStore {
             guard isPreview || fresh.profile.id == accountID else { throw OKAPIError.authentication }
             try persist(fresh, context: context)
             snapshot = fresh
-            friendOffset = fresh.friends.count
             if !isPreview { sessionState = .connected }
         } catch {
             guard generation == attempt, !Task.isCancelled, !(error is CancellationError) else { return }
@@ -143,24 +140,22 @@ final class AppStore {
     }
 
     func loadMoreFriends(context: ModelContext) async {
-        guard !isLoadingMore, !isLoading, let service, let current = snapshot,
-              friendOffset < current.friendIDs.count else { return }
+        guard !isLoadingMore, !isLoading, let service, let current = snapshot, current.hasMoreFriends else { return }
         isLoadingMore = true
         defer { isLoadingMore = false }
         let attempt = generation
-        let ids = Array(current.friendIDs.dropFirst(friendOffset).prefix(OKSocialService.friendBatchSize))
+        let offset = current.friendCursor ?? current.friends.count
+        let ids = Array(current.friendIDs.dropFirst(offset).prefix(OKSocialService.friendBatchSize))
         do {
             let friends = try await service.fetchFriends(ids: ids)
             try Task.checkCancellation()
             guard generation == attempt, var value = snapshot else { return }
             var seen = Set(value.friends.map(\.id))
             value.friends += friends.filter { seen.insert($0.id).inserted }
-            let returned = Set(friends.map(\.id))
-            let missing = Set(ids).subtracting(returned)
-            value.friendIDs.removeAll { missing.contains($0) }
+            // A private/deleted user can be missing from getInfo. Still advance the cursor.
+            value.friendCursor = offset + ids.count
             try persist(value, context: context)
             snapshot = value
-            friendOffset = value.friends.count
         } catch { report(error, attempt: attempt) }
     }
 

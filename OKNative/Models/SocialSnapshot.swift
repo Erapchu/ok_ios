@@ -6,12 +6,13 @@ struct SocialSnapshot: Codable, Sendable {
     var photos: [SocialPhoto]
     let posts: [FeedPost]
     var friendIDs: [String] = []
+    var friendCursor: Int? = nil
     var photoAnchor: String? = nil
     var totalPhotoCount: Int? = nil
     var issues: [SectionIssue] = []
 
     var totalFriends: Int { max(friendIDs.count, friends.count) }
-    var hasMoreFriends: Bool { friends.count < friendIDs.count }
+    var hasMoreFriends: Bool { (friendCursor ?? friends.count) < friendIDs.count }
 }
 
 struct UserProfile: Codable, Sendable {

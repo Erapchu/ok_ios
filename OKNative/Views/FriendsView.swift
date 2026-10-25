@@ -45,7 +45,8 @@ struct FriendsView: View {
             if filtered.isEmpty && store.snapshot?.hasMoreFriends != true {
                 if search.isEmpty {
                     ContentUnavailableView("Друзья", systemImage: "person.2",
-                        description: Text(store.snapshot?.issues.first { $0.section == "friends" }?.message ?? "Список друзей пока пуст."))
+                        description: Text(store.snapshot?.issues.first { $0.section == "friends" }?.message
+                            ?? ((store.snapshot?.totalFriends ?? 0) > 0 ? "ОК не вернул доступные профили. Попробуйте обновить данные." : "Список друзей пока пуст.")))
                 } else { ContentUnavailableView.search(text: search) }
             }
         }

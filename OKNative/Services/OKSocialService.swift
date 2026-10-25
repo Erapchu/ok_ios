@@ -14,6 +14,7 @@ struct OKSocialService: SocialService {
         let (friends, photos) = try await (friendsResult, photosResult)
         var snapshot = SocialSnapshot(profile: user.profile, friends: friends.people, photos: photos.page.photos, posts: [])
         snapshot.friendIDs = friends.ids
+        snapshot.friendCursor = friends.issue == nil ? min(friends.ids.count, Self.friendBatchSize) : 0
         snapshot.photoAnchor = photos.page.nextAnchor
         snapshot.totalPhotoCount = photos.page.totalCount
         snapshot.issues = [friends.issue, photos.issue].compactMap { $0 }

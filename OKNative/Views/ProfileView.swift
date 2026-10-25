@@ -31,10 +31,12 @@ struct ProfileView: View {
         .background(OKTheme.background)
         .navigationTitle("Мой профиль").navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Text("ок").font(.title2.bold()).foregroundStyle(OKTheme.orange).accessibilityLabel("ОК")
+            ToolbarItem(placement: .topBarTrailing) {
+                NavigationLink { SettingsView() } label: {
+                    Label("Настройки", systemImage: "gearshape")
+                }
+                .labelStyle(.iconOnly)
             }
-            ToolbarItem(placement: .topBarTrailing) { DemoLabel() }
         }
         .fullScreenCover(item: $selectedPhoto) { photo in
             PhotoViewer(photos: store.snapshot?.photos ?? [photo], initialID: photo.id)

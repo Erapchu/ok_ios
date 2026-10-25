@@ -1,7 +1,7 @@
 import SwiftUI
 import SwiftData
 
-enum AppTab: Hashable { case feed, profile, photos, settings }
+enum AppTab: Hashable { case feed, photos, profile }
 
 struct RootView: View {
     @Environment(AppStore.self) private var store
@@ -25,12 +25,10 @@ struct RootView: View {
             TabView(selection: $selection) {
             NavigationStack { FeedView() }
                 .tabItem { Label("Лента", systemImage: "rectangle.stack") }.tag(AppTab.feed)
-            NavigationStack { ProfileView() }
-                .tabItem { Label("Профиль", systemImage: "person.crop.circle") }.tag(AppTab.profile)
             NavigationStack { PhotosView() }
                 .tabItem { Label("Фото", systemImage: "photo.on.rectangle.angled") }.tag(AppTab.photos)
-            NavigationStack { SettingsView() }
-                .tabItem { Label("Настройки", systemImage: "slider.horizontal.3") }.tag(AppTab.settings)
+            NavigationStack { ProfileView() }
+                .tabItem { Label("Профиль", systemImage: "person.crop.circle") }.tag(AppTab.profile)
             }
             .id(store.snapshot?.profile.id ?? "loading")
             .modifier(LiquidTabBehavior())

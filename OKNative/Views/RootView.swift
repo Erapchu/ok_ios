@@ -7,10 +7,22 @@ struct RootView: View {
     @Environment(AppStore.self) private var store
     @Environment(\.modelContext) private var context
     @State private var selection: AppTab = .profile
+    @State private var reconnect = false
 
     var body: some View {
-        @Bindable var store = store
-        TabView(selection: $selection) {
+        Group {
+          if store.sessionState == .restoring { ProgressView("Открываем ОК…") }
+          else if store.sessionState == .signedOut {
+            NavigationStack { ConnectAccountView() }
+          } else {
+           VStack(spacing: 0) {
+            if store.sessionState == .expired {
+                Button { reconnect = true } label: {
+                    Label("Сессия истекла · Подключить снова", systemImage: "key")
+                        .font(.subheadline).frame(maxWidth: .infinity).padding(10)
+                }.modifier(GlassActionStyle())
+            }
+            TabView(selection: $selection) {
             NavigationStack { FeedView() }
                 .tabItem { Label("Лента", systemImage: "rectangle.stack") }.tag(AppTab.feed)
             NavigationStack { ProfileView() }
@@ -19,8 +31,12 @@ struct RootView: View {
                 .tabItem { Label("Фото", systemImage: "photo.on.rectangle.angled") }.tag(AppTab.photos)
             NavigationStack { SettingsView() }
                 .tabItem { Label("Настройки", systemImage: "slider.horizontal.3") }.tag(AppTab.settings)
+            }.modifier(LiquidTabBehavior())
+           }
+          }
         }
-        .task { await store.load(context: context) }
+        .task { await store.restore(context: context) }
+        .sheet(isPresented: $reconnect) { NavigationStack { ConnectAccountView(isSheet: true) } }
         .alert("Не удалось выполнить действие", isPresented: Binding(
             get: { store.errorMessage != nil },
             set: { if !$0 { store.errorMessage = nil } }
@@ -41,7 +57,7 @@ struct LoadingContent: View {
             ContentUnavailableView {
                 Label("Пока нет данных", systemImage: "tray")
             } description: {
-                Text("Загрузите демонстрационный профиль, чтобы познакомиться с приложением.")
+                Text("Обновите данные профиля. При отсутствии интернета ранее сохранённые данные будут доступны из кеша.")
             } actions: {
                 Button("Попробовать снова") { Task { await store.load(context: context, refresh: true) } }
                     .buttonStyle(.borderedProminent)

@@ -4,9 +4,12 @@ import Security
 struct AuthTokens: Codable, Sendable, Equatable {
     let accessToken: String
     let expiresAt: Date?
+    var applicationKey: String? = nil
+    var sessionSecretKey: String? = nil
+    var accountID: String? = nil
 }
 
-/// Only the future OAuth flow should call this store. Demo mode never requests a token.
+/// Credentials stay on this device; they are never stored in UserDefaults or the snapshot.
 actor KeychainTokenStore {
     enum Failure: Error { case status(OSStatus), invalidData }
     private let service: String

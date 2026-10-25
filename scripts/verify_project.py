@@ -25,7 +25,7 @@ def main():
     asset_names = set(re.findall(r'"((?:photo-|avatar-)[a-z]+|AppMark)"', swift))
     assert asset_names <= images, f"Unresolved image names: {asset_names - images}"
     data = (ROOT / "OKNative/Services/DemoSocialService.swift").read_text(encoding="utf-8")
-    photo_ids = re.findall(r'DemoPhoto\(id: "([^"]+)"', data)
+    photo_ids = re.findall(r'SocialPhoto\(id: "([^"]+)"', data)
     post_photos = re.findall(r'photoID: "([^"]+)"', data)
     assert len(photo_ids) == len(set(photo_ids)) == 6
     assert set(post_photos) <= set(photo_ids)

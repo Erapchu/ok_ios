@@ -11,7 +11,7 @@ final class AppStoreTests: XCTestCase {
 
     func testSnapshotAndReactionsSurviveNewStore() async throws {
         let storage = try container()
-        let store = AppStore()
+        let store = AppStore(service: DemoSocialService())
         await store.load(context: storage.mainContext)
         XCTAssertEqual(store.snapshot?.photos.count, 6)
         store.toggle("photo:lake", context: storage.mainContext)
@@ -39,10 +39,10 @@ final class AppStoreTests: XCTestCase {
 
     func testClearCachePreservesReactionsAndRebuildsSnapshot() async throws {
         let storage = try container()
-        let store = AppStore()
+        let store = AppStore(service: DemoSocialService())
         await store.load(context: storage.mainContext)
         store.toggle("photo:lake", context: storage.mainContext)
-        store.clearCache(context: storage.mainContext)
+        await store.clearCache(context: storage.mainContext)
         XCTAssertTrue(try storage.mainContext.fetch(FetchDescriptor<CachedSnapshot>()).isEmpty)
         XCTAssertTrue(store.isSaved("photo:lake"))
         XCTAssertNil(store.updatedAt)
@@ -55,7 +55,7 @@ final class AppStoreTests: XCTestCase {
         let storage = try container()
         storage.mainContext.insert(CachedSnapshot(payload: Data("invalid".utf8)))
         try storage.mainContext.save()
-        let store = AppStore()
+        let store = AppStore(service: DemoSocialService())
         await store.load(context: storage.mainContext)
         XCTAssertNotNil(store.snapshot)
         XCTAssertNil(store.errorMessage)

@@ -84,7 +84,7 @@ def generate():
     app_configs = configurations("app", {
         "PRODUCT_NAME": "$(TARGET_NAME)", "PRODUCT_BUNDLE_IDENTIFIER": "app.erapchu.oknative",
         "INFOPLIST_FILE": "OKNative/Resources/Info.plist", "GENERATE_INFOPLIST_FILE": "NO",
-        "MARKETING_VERSION": "0.1.0", "CURRENT_PROJECT_VERSION": "1",
+        "MARKETING_VERSION": "0.2.0", "CURRENT_PROJECT_VERSION": "1",
         "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon", "ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME": "AccentColor",
         "SUPPORTED_PLATFORMS": "iphoneos iphonesimulator", "SUPPORTS_MACCATALYST": "NO",
         "LD_RUNPATH_SEARCH_PATHS": "$(inherited) @executable_path/Frameworks",

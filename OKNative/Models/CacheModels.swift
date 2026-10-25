@@ -7,8 +7,8 @@ final class CachedSnapshot {
     var payload: Data
     var updatedAt: Date
 
-    init(payload: Data, updatedAt: Date = .now) {
-        self.key = "demo-snapshot-v1"
+    init(payload: Data, updatedAt: Date = .now, key: String = "preview-v2") {
+        self.key = key
         self.payload = payload
         self.updatedAt = updatedAt
     }

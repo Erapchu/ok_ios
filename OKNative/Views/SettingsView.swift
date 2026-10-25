@@ -8,6 +8,8 @@ struct SettingsView: View {
     @AppStorage("haptics") private var haptics = true
     @State private var confirmingClear = false
     @State private var cacheCleared = false
+    @State private var connecting = false
+    @State private var confirmingSignOut = false
 
     var body: some View {
         Form {
@@ -29,7 +31,7 @@ struct SettingsView: View {
                 Toggle(isOn: $haptics) { Label("Тактильный отклик", systemImage: "hand.tap") }
             }
             Section {
-                LabeledContent("Источник данных", value: "Демонстрационный")
+                LabeledContent("Источник данных", value: store.isPreview ? "Демо для проверки интерфейса" : "API Одноклассников")
                 if let date = store.updatedAt {
                     LabeledContent("Кеш обновлён") { Text(date, format: .dateTime.day().month().hour().minute()).foregroundStyle(.secondary) }
                 } else { LabeledContent("Кеш", value: "Пуст") }
@@ -37,7 +39,7 @@ struct SettingsView: View {
                     Task { await store.load(context: context, refresh: true) }
                 } label: {
                     HStack {
-                        Label("Обновить демо-данные", systemImage: "arrow.clockwise")
+                        Label("Обновить данные", systemImage: "arrow.clockwise")
                         Spacer()
                         if store.isLoading { ProgressView() }
                     }
@@ -46,12 +48,18 @@ struct SettingsView: View {
                     Label("Очистить кеш", systemImage: "trash")
                 }.disabled(store.isLoading || store.updatedAt == nil)
             } header: { Text("Данные на устройстве") } footer: {
-                Text("Профиль и фотографии работают без интернета. Избранное, классы и изменения профиля сохраняются отдельно от кеша.")
+                Text("Профиль и ранее открытые фотографии доступны из локального кеша. Избранное сохраняется только на этом iPhone и не отправляется в ОК.")
             }
             Section {
-                Label("Авторизация пока не подключена", systemImage: "lock.shield")
-                Text("Сейчас приложение не запрашивает пароль или токен ОК. Для следующего этапа подготовлено хранилище Keychain.")
-                    .font(.footnote).foregroundStyle(.secondary)
+                if store.isPreview {
+                    Label("Предпросмотр интерфейса", systemImage: "sparkles")
+                } else {
+                    Label(store.snapshot?.profile.name ?? "Аккаунт ОК", systemImage: "person.crop.circle")
+                    Button("Обновить доступ") { connecting = true }
+                    Button("Выйти из аккаунта", role: .destructive) { confirmingSignOut = true }
+                    Text("Токены защищены Keychain. При выходе токены, кеш и локальное избранное удаляются с этого iPhone.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
             } header: { Text("Аккаунт") }
             Section("О приложении") {
                 LabeledContent("Версия", value: "\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.0") (\(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1"))")
@@ -61,28 +69,35 @@ struct SettingsView: View {
         .navigationTitle("Настройки")
         .confirmationDialog("Удалить локальный кеш?", isPresented: $confirmingClear, titleVisibility: .visible) {
             Button("Очистить кеш", role: .destructive) {
-                store.clearCache(context: context)
-                cacheCleared = store.updatedAt == nil
+                Task {
+                    await store.clearCache(context: context)
+                    cacheCleared = store.updatedAt == nil
+                }
             }
-        } message: { Text("Избранное и настройки сохранятся. Демо-данные можно загрузить заново.") }
+        } message: { Text("Избранное и настройки сохранятся. Для повторной загрузки фотографий потребуется интернет.") }
         .alert("Кеш очищен", isPresented: $cacheCleared) {
             Button("Готово", role: .cancel) { }
         } message: { Text("Открытые данные остаются в памяти до закрытия приложения.") }
+        .sheet(isPresented: $connecting) { NavigationStack { ConnectAccountView(isSheet: true) } }
+        .confirmationDialog("Выйти из аккаунта?", isPresented: $confirmingSignOut, titleVisibility: .visible) {
+            Button("Выйти и удалить данные", role: .destructive) { Task { await store.signOut(context: context) } }
+        } message: { Text("Токены, кеш и локальное избранное будут удалены с этого iPhone.") }
     }
 }
 
 private struct AboutView: View {
     var body: some View {
         List {
-            Section("Первый шаг") {
-                Text("Неофициальный нативный прототип клиента Одноклассников. Все имена, профили, статусы и публикации — демонстрационные.")
+            Section("ОК на iPhone") {
+                Text("Неофициальный нативный клиент Одноклассников. Профиль, друзья и личные фотографии загружаются из API вашего аккаунта.")
                 Text("Интерфейс построен на SwiftUI. Локальный кеш — SwiftData. Сетевой слой использует URLSession и Swift Concurrency.")
+                Text("На iOS 26 используется Liquid Glass. На iOS 17–18 приложение использует стандартное оформление этих версий системы.")
             }
             Section("Следующий шаг") {
-                Text("Регистрация приложения в ОК, проверка доступных разрешений API и подключение OAuth. Набор функций будет зависеть от доступа, который предоставляет платформа.")
+                Text("В этой версии поддерживается личный доступ владельца приложения по паре токенов разработчика. Вход через OAuth, лента, публикации и изменение профиля пока не подключены.")
             }
             Section("Фотографии") {
-                Text("Демонстрационные фотографии: Unsplash. Источники изображений приведены в ASSET_CREDITS.md в репозитории.")
+                Text("В режиме API показываются ваши фотографии. Ресурсы Unsplash используются только для отладки интерфейса и тестов.")
             }
         }.navigationTitle("О прототипе").navigationBarTitleDisplayMode(.inline)
     }

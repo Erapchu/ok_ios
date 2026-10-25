@@ -12,9 +12,7 @@ struct Avatar: View {
     var online = false
 
     var body: some View {
-        Image(asset)
-            .resizable()
-            .scaledToFill()
+        MediaImage(reference: asset)
             .frame(width: size, height: size)
             .clipShape(Circle())
             .overlay(Circle().stroke(.background, lineWidth: 3))
@@ -30,14 +28,16 @@ struct Avatar: View {
 }
 
 struct DemoLabel: View {
+    @Environment(AppStore.self) private var store
     var body: some View {
-        Label("ДЕМО", systemImage: "sparkle")
+        Label(store.isPreview ? "ДЕМО" : "ОК API", systemImage: store.isPreview ? "sparkle" : "checkmark.shield")
+            .labelStyle(.titleAndIcon)
             .font(.system(size: 10, weight: .bold, design: .rounded))
             .tracking(1)
             .padding(.horizontal, 9).padding(.vertical, 5)
             .foregroundStyle(OKTheme.orange)
             .background(OKTheme.orange.opacity(0.1), in: Capsule())
-            .accessibilityLabel("Демонстрационный режим")
+            .accessibilityLabel(store.isPreview ? "Демонстрационный режим" : "Данные Одноклассников")
     }
 }
 
@@ -55,14 +55,13 @@ struct SectionHeading: View {
 }
 
 struct PhotoTile: View {
-    let photo: DemoPhoto
+    let photo: SocialPhoto
     var height: CGFloat = 150
     var showTitle = true
 
     var body: some View {
         GeometryReader { geometry in
-            Image(photo.asset)
-                .resizable().scaledToFill()
+            MediaImage(reference: photo.asset)
                 .frame(width: geometry.size.width, height: geometry.size.height)
                 .overlay(alignment: .bottomLeading) {
                     if showTitle {

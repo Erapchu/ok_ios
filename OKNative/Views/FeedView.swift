@@ -5,11 +5,20 @@ struct FeedView: View {
     @Environment(AppStore.self) private var store
     @Environment(\.modelContext) private var context
     var onlyOwnPosts = false
-    @State private var selectedPhoto: DemoPhoto?
+    @State private var selectedPhoto: SocialPhoto?
 
     var body: some View {
         Group {
-            if let snapshot = store.snapshot {
+            if !store.isPreview {
+                ContentUnavailableView {
+                    Label("Лента пока недоступна", systemImage: "rectangle.stack")
+                } description: {
+                    Text("Для этой версии подключены профиль, друзья и фотографии. Доступ к ленте требует отдельной проверки возможностей API вашего приложения.")
+                } actions: {
+                    Link("Открыть ленту в ОК", destination: URL(string: "https://ok.ru")!)
+                        .modifier(GlassActionStyle(prominent: true))
+                }
+            } else if let snapshot = store.snapshot {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
                         if !onlyOwnPosts {
@@ -47,8 +56,8 @@ private struct FeedPostCard: View {
     @AppStorage("haptics") private var haptics = true
     @AppStorage("profile.name") private var customName = ""
     let post: FeedPost
-    let photo: DemoPhoto?
-    let openPhoto: (DemoPhoto) -> Void
+    let photo: SocialPhoto?
+    let openPhoto: (SocialPhoto) -> Void
     private var liked: Bool { store.isSaved("post:\(post.id)") }
 
     var body: some View {

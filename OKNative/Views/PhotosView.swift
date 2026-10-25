@@ -3,11 +3,12 @@ import SwiftData
 
 struct PhotosView: View {
     @Environment(AppStore.self) private var store
+    @Environment(\.modelContext) private var context
     @State private var filter = "Все"
-    @State private var selectedPhoto: DemoPhoto?
-    private let filters = ["Все", "Путешествия", "Моменты", "Избранное"]
+    @State private var selectedPhoto: SocialPhoto?
+    private var filters: [String] { ["Все", "Избранное"] }
 
-    private var photos: [DemoPhoto] {
+    private var photos: [SocialPhoto] {
         (store.snapshot?.photos ?? []).filter {
             filter == "Все" || (filter == "Избранное" ? store.isSaved("photo:\($0.id)") : $0.album == filter)
         }
@@ -19,6 +20,9 @@ struct PhotosView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
                         SectionHeading(title: "Жизнь в кадре", subtitle: "Места, к которым хочется вернуться")
+                        if let issue = store.snapshot?.issues.first(where: { $0.section == "photos" }) {
+                            Text(issue.message).font(.subheadline).foregroundStyle(.secondary)
+                        }
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 8) {
                                 ForEach(filters, id: \.self) { item in
@@ -26,15 +30,14 @@ struct PhotosView: View {
                                         Text(item).font(.subheadline.weight(.medium))
                                             .padding(.horizontal, 16).padding(.vertical, 10)
                                             .foregroundStyle(filter == item ? .white : .primary)
-                                            .background(filter == item ? OKTheme.orange : OKTheme.surface, in: Capsule())
-                                    }.buttonStyle(.plain)
+                                    }.modifier(GlassActionStyle(prominent: filter == item))
                                         .accessibilityAddTraits(filter == item ? .isSelected : [])
                                 }
                             }
                         }
                         if photos.isEmpty {
                             ContentUnavailableView("Пока пусто", systemImage: "heart",
-                                description: Text("Откройте фотографию и нажмите на сердечко, чтобы добавить её в избранное."))
+                                description: Text(filter == "Избранное" ? "Откройте фотографию и нажмите на сердечко. Избранное хранится на этом iPhone." : "В личном альбоме пока нет доступных фотографий."))
                                 .padding(.top, 40)
                         } else {
                             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
@@ -51,11 +54,19 @@ struct PhotosView: View {
                                     }.buttonStyle(.plain)
                                 }
                             }
-                            Text("\(photos.count) из \(store.snapshot?.photos.count ?? 0) фото · демо-альбом")
+                            Text("\(photos.count) фото · \(store.isPreview ? "демо-альбом" : "личный альбом ОК")")
                                 .font(.caption).foregroundStyle(.secondary)
+                        }
+                        if store.snapshot?.photoAnchor != nil {
+                            Button {
+                                Task { await store.loadMorePhotos(context: context) }
+                            } label: {
+                                HStack { Text("Загрузить ещё"); if store.isLoadingMore { ProgressView() } }
+                            }.modifier(GlassActionStyle()).disabled(store.isLoadingMore)
                         }
                     }.padding(20)
                 }
+                .refreshable { await store.load(context: context, refresh: true) }
             }
         }
         .background(OKTheme.background)
@@ -72,22 +83,22 @@ struct PhotoViewer: View {
     @Environment(\.modelContext) private var context
     @Environment(AppStore.self) private var store
     @AppStorage("haptics") private var haptics = true
-    @State private var photos: [DemoPhoto]
+    @State private var photos: [SocialPhoto]
     @State private var selection: String
 
-    init(photos: [DemoPhoto], initialID: String) {
+    init(photos: [SocialPhoto], initialID: String) {
         _photos = State(initialValue: photos)
         _selection = State(initialValue: initialID)
     }
 
-    private var current: DemoPhoto? { photos.first { $0.id == selection } }
+    private var current: SocialPhoto? { photos.first { $0.id == selection } }
 
     var body: some View {
         VStack(spacing: 0) {
             HStack {
                 Button { dismiss() } label: {
-                    Image(systemName: "xmark").font(.headline).padding(13).background(.white.opacity(0.12), in: Circle())
-                }.accessibilityLabel("Закрыть фотографию")
+                    Image(systemName: "xmark").font(.headline).frame(width: 44, height: 44)
+                }.modifier(GlassActionStyle()).accessibilityLabel("Закрыть фотографию")
                 Spacer()
                 if let index = photos.firstIndex(where: { $0.id == selection }) {
                     Text("\(index + 1) / \(photos.count)").font(.subheadline.monospacedDigit())
@@ -95,7 +106,7 @@ struct PhotoViewer: View {
             }.padding(.horizontal, 20).padding(.top, 12)
             TabView(selection: $selection) {
                 ForEach(photos) { photo in
-                    Image(photo.asset).resizable().scaledToFit().padding(.vertical, 20)
+                    MediaImage(reference: photo.asset, mode: .fit).padding(.vertical, 20)
                         .tag(photo.id).accessibilityLabel("\(photo.title), \(photo.location)")
                 }
             }.tabViewStyle(.page(indexDisplayMode: .never))
@@ -103,7 +114,9 @@ struct PhotoViewer: View {
                 HStack(spacing: 20) {
                     VStack(alignment: .leading, spacing: 5) {
                         Text(photo.title).font(.title3.bold())
-                        Label(photo.location, systemImage: "mappin.and.ellipse").font(.subheadline).foregroundStyle(.white.opacity(0.65))
+                        if !photo.location.isEmpty {
+                            Label(photo.location, systemImage: "mappin.and.ellipse").font(.subheadline).foregroundStyle(.white.opacity(0.65))
+                        }
                     }
                     Spacer(minLength: 0)
                     Button {
@@ -115,10 +128,16 @@ struct PhotoViewer: View {
                     }
                     .accessibilityLabel(store.isSaved("photo:\(photo.id)") ? "Убрать из избранного" : "В избранное")
                     .sensoryFeedback(.selection, trigger: store.isSaved("photo:\(photo.id)")) { _, _ in haptics }
-                    ShareLink(item: Image(photo.asset), preview: SharePreview(photo.title, image: Image(photo.asset))) {
-                        Image(systemName: "square.and.arrow.up").font(.title2).frame(width: 44, height: 44)
-                    }.accessibilityLabel("Поделиться фотографией")
-                }.padding(20)
+                    if let url = URL(string: photo.asset), url.scheme == "https" {
+                        ShareLink(item: url) {
+                            Image(systemName: "square.and.arrow.up").font(.title2).frame(width: 44, height: 44)
+                        }.accessibilityLabel("Поделиться ссылкой на фотографию")
+                    } else {
+                        ShareLink(item: Image(photo.asset), preview: SharePreview(photo.title, image: Image(photo.asset))) {
+                            Image(systemName: "square.and.arrow.up").font(.title2).frame(width: 44, height: 44)
+                        }.accessibilityLabel("Поделиться фотографией")
+                    }
+                }.padding(20).modifier(FloatingGlass()).padding(.horizontal, 12).padding(.bottom, 12)
             }
         }
         .background(.black).foregroundStyle(.white)

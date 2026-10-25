@@ -4,177 +4,140 @@ import SwiftData
 struct ProfileView: View {
     @Environment(AppStore.self) private var store
     @Environment(\.modelContext) private var context
-    @AppStorage("profile.name") private var customName = ""
-    @AppStorage("profile.bio") private var customBio = ""
-    @AppStorage("profile.edited") private var profileEdited = false
-    @State private var editing = false
-    @State private var selectedPhoto: DemoPhoto?
+    @State private var selectedPhoto: SocialPhoto?
 
     var body: some View {
         Group {
-            if let snapshot = store.snapshot {
+            if let data = store.snapshot {
                 ScrollView {
-                    VStack(spacing: 24) {
-                        profileCard(snapshot)
-                        friendsCard(snapshot)
-                        photosSection(snapshot)
-                        aboutCard(snapshot)
-                        Label("Тестовый профиль · данные доступны офлайн", systemImage: "checkmark.seal")
+                    VStack(spacing: 26) {
+                        profileCard(data)
+                        ForEach(data.issues) { issue in
+                            Label(issue.message, systemImage: "exclamationmark.circle")
+                                .font(.subheadline).foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(18).background(OKTheme.surface, in: RoundedRectangle(cornerRadius: 20))
+                        }
+                        friendsSection(data)
+                        photosSection(data)
+                        Label(store.isPreview ? "Демонстрационный профиль" : "Данные вашего аккаунта ОК",
+                              systemImage: store.isPreview ? "sparkles" : "lock.shield")
                             .font(.caption).foregroundStyle(.secondary)
-                    }
-                    .padding(.horizontal, 20).padding(.bottom, 28)
+                    }.padding(.horizontal, 20).padding(.bottom, 28)
                 }
                 .refreshable { await store.load(context: context, refresh: true) }
             } else { LoadingContent() }
         }
         .background(OKTheme.background)
-        .navigationTitle("Мой профиль")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationTitle("Мой профиль").navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) { Text("ок").font(.title2.bold()).foregroundStyle(OKTheme.orange).accessibilityLabel("ОК, нативный клиент") }
-            ToolbarItem(placement: .topBarTrailing) { DemoLabel() }
-        }
-        .sheet(isPresented: $editing) {
-            if let profile = store.snapshot?.profile {
-                EditProfileView(name: profileEdited ? customName : profile.name,
-                                bio: profileEdited ? customBio : profile.bio) { name, bio in
-                    customName = name
-                    customBio = bio
-                    profileEdited = true
-                }
+            ToolbarItem(placement: .topBarLeading) {
+                Text("ок").font(.title2.bold()).foregroundStyle(OKTheme.orange).accessibilityLabel("ОК")
             }
+            ToolbarItem(placement: .topBarTrailing) { DemoLabel() }
         }
         .fullScreenCover(item: $selectedPhoto) { photo in
             PhotoViewer(photos: store.snapshot?.photos ?? [photo], initialID: photo.id)
         }
     }
 
-    private func profileCard(_ snapshot: SocialSnapshot) -> some View {
+    private func profileCard(_ data: SocialSnapshot) -> some View {
         VStack(spacing: 0) {
             GeometryReader { geometry in
-                Image("photo-lake").resizable().scaledToFill()
-                    .frame(width: geometry.size.width, height: geometry.size.height).clipped()
-            }
-                .frame(height: 146)
-                .overlay(LinearGradient(colors: [.black.opacity(0.05), .black.opacity(0.25)], startPoint: .top, endPoint: .bottom))
-                .overlay(alignment: .topTrailing) {
-                    Label("Мои моменты", systemImage: "sun.max")
-                        .font(.caption.weight(.medium)).foregroundStyle(.white)
-                        .padding(10).background(.black.opacity(0.2), in: Capsule()).padding(14)
-                }
-            VStack(spacing: 12) {
-                Avatar(asset: snapshot.profile.avatar, size: 100, online: true).padding(.top, -50)
-                Text(profileEdited ? customName : snapshot.profile.name)
-                    .font(.title2.bold()).multilineTextAlignment(.center)
-                Label(snapshot.profile.city, systemImage: "mappin.and.ellipse")
-                    .font(.subheadline).foregroundStyle(.secondary)
-                Text(profileEdited ? customBio : snapshot.profile.bio)
-                    .font(.subheadline).multilineTextAlignment(.center).lineSpacing(3)
-                    .padding(.horizontal, 12)
-                Button { editing = true } label: {
-                    Label("Редактировать профиль", systemImage: "pencil")
-                        .font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity).padding(.vertical, 5)
-                }
-                .buttonStyle(.borderedProminent).clipShape(RoundedRectangle(cornerRadius: 12))
-                HStack(spacing: 0) {
-                    NavigationLink { FriendsView(friends: snapshot.friends) } label: {
-                        statistic("\(snapshot.friends.count)", title: "друга")
-                    }
-                    Divider().frame(height: 30)
-                    NavigationLink { PhotosView() } label: { statistic("\(snapshot.photos.count)", title: "фотографий") }
-                    Divider().frame(height: 30)
-                    NavigationLink { FeedView(onlyOwnPosts: true) } label: {
-                        statistic("\(snapshot.posts.filter { $0.avatar == snapshot.profile.avatar }.count)", title: "публикация")
+                Group {
+                    if let photo = data.photos.first { MediaImage(reference: photo.asset) }
+                    else {
+                        LinearGradient(colors: [OKTheme.orange.opacity(0.75), .orange.opacity(0.2)], startPoint: .topLeading, endPoint: .bottomTrailing)
                     }
                 }
-                .buttonStyle(.plain).padding(.top, 8)
+                .frame(width: geometry.size.width, height: geometry.size.height).clipped()
             }
-            .padding(.horizontal, 20).padding(.bottom, 20)
+            .frame(height: 150)
+            .overlay(alignment: .topTrailing) {
+                Label("Мой ОК", systemImage: "sparkle")
+                    .font(.caption.weight(.medium)).padding(12)
+                    .modifier(FloatingGlass()).padding(14)
+            }
+            VStack(spacing: 14) {
+                Avatar(asset: data.profile.avatar, size: 104).padding(.top, -52)
+                Text(data.profile.name).font(.title2.bold()).multilineTextAlignment(.center)
+                if !data.profile.city.isEmpty {
+                    Label(data.profile.city, systemImage: "mappin.and.ellipse")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                }
+                if !data.profile.bio.isEmpty {
+                    Text(data.profile.bio).font(.subheadline).multilineTextAlignment(.center).lineSpacing(4)
+                }
+                if let url = data.profile.profileURL.flatMap(URL.init(string:)), url.scheme == "https" {
+                    Link(destination: url) {
+                        Label("Открыть в ОК", systemImage: "arrow.up.right")
+                            .font(.subheadline.weight(.semibold)).frame(maxWidth: .infinity).padding(.vertical, 6)
+                    }.modifier(GlassActionStyle(prominent: true))
+                }
+                HStack {
+                    NavigationLink { FriendsView() } label: {
+                        statistic(data.issues.contains { $0.section == "friends" } && data.friendIDs.isEmpty ? "—" : data.totalFriends.formatted(), "Друзья")
+                    }
+                    Divider().frame(height: 32)
+                    NavigationLink { PhotosView() } label: {
+                        statistic(data.issues.contains { $0.section == "photos" } ? "—" : (data.totalPhotoCount ?? data.photos.count).formatted(), data.totalPhotoCount == nil && data.photoAnchor != nil ? "Фото загружено" : "Фотографии")
+                    }
+                }.buttonStyle(.plain).padding(.top, 6)
+            }.padding(.horizontal, 22).padding(.bottom, 24)
         }
-        .background(OKTheme.surface, in: RoundedRectangle(cornerRadius: 24))
-        .clipShape(RoundedRectangle(cornerRadius: 24))
-        .padding(.top, 10)
+        .background(OKTheme.surface, in: RoundedRectangle(cornerRadius: 28))
+        .clipShape(RoundedRectangle(cornerRadius: 28)).padding(.top, 12)
     }
 
-    private func statistic(_ value: String, title: String) -> some View {
-        VStack(spacing: 4) {
+    private func statistic(_ value: String, _ title: String) -> some View {
+        VStack(spacing: 5) {
             Text(value).font(.title3.bold()).foregroundStyle(.primary)
             Text(title).font(.caption).foregroundStyle(.secondary)
-        }.frame(maxWidth: .infinity).padding(.vertical, 4)
+        }.frame(maxWidth: .infinity).padding(.vertical, 6)
     }
 
-    private func friendsCard(_ snapshot: SocialSnapshot) -> some View {
+    private func friendsSection(_ data: SocialSnapshot) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                SectionHeading(title: "Люди рядом", subtitle: "Друзья, с которыми на одной волне")
-                NavigationLink { FriendsView(friends: snapshot.friends) } label: {
-                    Image(systemName: "arrow.up.right").font(.body.weight(.semibold)).padding(10)
-                }.accessibilityLabel("Все друзья")
+                SectionHeading(title: "Люди рядом", subtitle: "Ваши друзья в Одноклассниках")
+                NavigationLink { FriendsView() } label: { Image(systemName: "arrow.up.right").padding(12) }
+                    .modifier(GlassActionStyle()).accessibilityLabel("Все друзья")
             }
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(alignment: .top, spacing: 22) {
-                    ForEach(snapshot.friends) { friend in
-                        NavigationLink { FriendDetailView(friend: friend) } label: {
-                            VStack(spacing: 8) {
-                                Avatar(asset: friend.avatar, size: 58, online: friend.isOnline)
-                                Text(friend.name.components(separatedBy: " ").first ?? friend.name)
-                                    .font(.caption).foregroundStyle(.primary)
-                            }
-                        }.buttonStyle(.plain)
-                    }
-                }.padding(3)
-            }
-        }
-    }
-
-    private func photosSection(_ snapshot: SocialSnapshot) -> some View {
-        VStack(spacing: 14) {
-            HStack {
-                SectionHeading(title: "В объективе", subtitle: "Маленькие истории из моей жизни")
-                NavigationLink("Все") { PhotosView() }.font(.subheadline.weight(.semibold))
-            }
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                ForEach(snapshot.photos.prefix(4)) { photo in
-                    Button { selectedPhoto = photo } label: { PhotoTile(photo: photo, height: 175) }
-                        .buttonStyle(.plain)
+            if data.friends.isEmpty {
+                Text(data.issues.contains { $0.section == "friends" } ? "Раздел пока недоступен" : "Здесь появятся ваши друзья")
+                    .font(.subheadline).foregroundStyle(.secondary)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(alignment: .top, spacing: 22) {
+                        ForEach(data.friends.prefix(10)) { friend in
+                            NavigationLink { FriendDetailView(friend: friend) } label: {
+                                VStack(spacing: 8) {
+                                    Avatar(asset: friend.avatar, size: 58, online: friend.isOnline)
+                                    Text(friend.name.components(separatedBy: " ").first ?? friend.name)
+                                        .font(.caption).foregroundStyle(.primary).lineLimit(1)
+                                }.frame(width: 66)
+                            }.buttonStyle(.plain)
+                        }
+                    }.padding(3)
                 }
             }
         }
     }
 
-    private func aboutCard(_ snapshot: SocialSnapshot) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("Немного обо мне").font(.headline)
-            Label(snapshot.profile.city, systemImage: "house")
-            Label("Путешествия, фотография, хорошая музыка", systemImage: "heart")
-            Label("Открыт новым впечатлениям", systemImage: "sparkles")
-        }
-        .font(.subheadline).frame(maxWidth: .infinity, alignment: .leading)
-        .padding(20).background(OKTheme.surface, in: RoundedRectangle(cornerRadius: 20))
-    }
-}
-
-struct EditProfileView: View {
-    @Environment(\.dismiss) private var dismiss
-    @State var name: String
-    @State var bio: String
-    let onSave: (String, String) -> Void
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section("Имя") { TextField("Как вас зовут", text: $name).textContentType(.name) }
-                Section("О себе") { TextField("Что вам нравится", text: $bio, axis: .vertical).lineLimit(3...6) }
-                Section { Text("Изменения сохраняются только на этом iPhone в демо-профиле.").font(.footnote).foregroundStyle(.secondary) }
+    private func photosSection(_ data: SocialSnapshot) -> some View {
+        VStack(spacing: 14) {
+            HStack {
+                SectionHeading(title: "В объективе", subtitle: "Личные фотографии из ОК")
+                NavigationLink("Все") { PhotosView() }.modifier(GlassActionStyle())
             }
-            .navigationTitle("Редактирование").navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Отмена") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Готово") {
-                        onSave(name.trimmingCharacters(in: .whitespacesAndNewlines), bio.trimmingCharacters(in: .whitespacesAndNewlines))
-                        dismiss()
-                    }.disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            if data.photos.isEmpty {
+                Text(data.issues.contains { $0.section == "photos" } ? "Раздел пока недоступен" : "Личный альбом пока пуст")
+                    .font(.subheadline).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                    ForEach(data.photos.prefix(4)) { photo in
+                        Button { selectedPhoto = photo } label: { PhotoTile(photo: photo, height: 180) }.buttonStyle(.plain)
+                    }
                 }
             }
         }
